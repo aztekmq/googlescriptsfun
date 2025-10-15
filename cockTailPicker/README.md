@@ -27,16 +27,18 @@ This document provides prescriptive guidance for deploying, configuring, and mai
 ## Deployment workflow
 Follow the steps in sequence. Each step builds on the preceding one.
 
-### 1. Create the Apps Script project
-1. Navigate to [script.google.com](https://script.google.com/) and sign in.
-2. Select **New project**.
-3. Rename the project to **Cocktail Picker** by selecting the default project name and editing it.
+### 1. Create the container-bound Apps Script project
+1. Navigate to [sheets.google.com](https://sheets.google.com/) and create a new blank Google Sheet. Rename the spreadsheet to a descriptive title such as **Cocktail Picker Storage**. This sheet becomes the persistent storage used by the application.
+2. With the sheet open, select **Extensions → Apps Script**. This action creates an Apps Script project that is automatically bound to the spreadsheet, guaranteeing that `SpreadsheetApp.getActiveSpreadsheet()` returns a valid workbook during execution.
+3. Rename the Apps Script project to **Cocktail Picker** by selecting the default project name and editing it.
+4. (Optional) Rename the default sheet tabs if desired. The script will create the required `GeneratedDrinks` and `VoteAudit` sheets automatically during its first run.
 
 ### 2. Replace the default script files
 1. In the Apps Script editor, delete any automatically created `.gs` file (for example `Code.gs`).
 2. Create a new script file named `Code.gs` and paste the server-side content from this repository's `cockTailPicker/Code.gs` file.
 3. Select **File → New → HTML file**, name it `Index`, and paste the contents from `cockTailPicker/Index.html`.
 4. Press **Ctrl+S** (Windows) or **Cmd+S** (macOS) to save all files.
+5. Return to the Google Sheet and refresh the page. Confirm that the spreadsheet now contains tabs named `GeneratedDrinks` and `VoteAudit`. If the tabs are missing, run the `ensureSpreadsheetStructure_` function from the Apps Script editor to initialize the storage before deploying the web app.
 
 > [!TIP]
 > When pasting the files, confirm that the header comments (`@fileoverview`) remain intact. These comments provide standardized documentation recognized across international teams.
@@ -104,6 +106,7 @@ The solution reads the OpenAI API key from a script property named `OPENAI_API_K
 ### Support and troubleshooting checklist
 | Symptom | Probable cause | Resolution steps |
 | --- | --- | --- |
+| `Error: An active spreadsheet is required for storage.` | The Apps Script project is standalone and not bound to a Google Sheet. | Open the storage spreadsheet, select **Extensions → Apps Script**, and re-paste the source files so the project remains container-bound. Then rerun the function that triggered the error. |
 | HTTP 401 Unauthorized | Invalid or missing `OPENAI_API_KEY` | Revalidate the script property and ensure the key is active in your OpenAI account. |
 | HTTP 429 Too Many Requests | OpenAI rate limit reached | Reduce invocation frequency or upgrade your OpenAI plan. Logs will contain the exact status code for confirmation. |
 | Empty or malformed cocktail response | Model returned non-JSON text | Review the execution log. The script performs a fallback parse and will raise an error with guidance if the payload is invalid. |
