@@ -81,19 +81,185 @@ function generateDrink(payload) {
   const request = sanitizeGenerationRequest_(payload);
   logVerbose_('Generation payload sanitized.', request);
 
-  const generator = getGeneratorByKey_(request.generatorKey);
-  logVerbose_('Resolved generator function for key.', request.generatorKey);
-
   const context = buildGenerationContext_(request);
   logVerbose_('Constructed deterministic context for generator.', context);
 
-  const blueprint = generator(context);
-  logVerbose_('Generator produced blueprint.', blueprint);
+  const generator = getGeneratorByKey_(request.generatorKey);
+  logVerbose_('Resolved generator function for key.', request.generatorKey);
+
+  let blueprint = null;
+  const openAiKey = getOpenAiApiKey_();
+  if (openAiKey) {
+    try {
+      blueprint = generateDrinkWithOpenAI_(request, context, openAiKey);
+      logVerbose_('OpenAI blueprint generation succeeded.', blueprint);
+    } catch (error) {
+      logVerbose_('OpenAI blueprint generation failed; reverting to deterministic generator.', {
+        message: error && error.message ? error.message : 'Unknown error',
+        stack: error && error.stack ? String(error.stack) : 'No stack available',
+      });
+    }
+  } else {
+    logVerbose_('OpenAI API key not detected; using deterministic generator.');
+  }
+
+  if (!blueprint) {
+    blueprint = generator(context);
+    logVerbose_('Deterministic generator produced blueprint.', blueprint);
+  }
 
   const persisted = persistBlueprint_(request, blueprint);
   logVerbose_('Blueprint persisted to spreadsheet.', persisted);
 
   return persisted;
+}
+
+/**
+ * Attempts to retrieve the OpenAI API key from script properties.
+ * @return {?string} API key if configured; otherwise null.
+ * @private
+ */
+function getOpenAiApiKey_() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const value = properties ? String(properties.getProperty('OPENAI_API_KEY') || '').trim() : '';
+    if (!value) {
+      return null;
+    }
+    logVerbose_('OpenAI API key located in script properties (masked length logged).', { length: value.length });
+    return value;
+  } catch (error) {
+    logVerbose_('Unable to access script properties for OpenAI API key.', {
+      message: error && error.message ? error.message : 'Unknown error',
+    });
+    return null;
+  }
+}
+
+/**
+ * Utilizes the OpenAI API to build a cocktail blueprint tailored to the request.
+ * Falls back to deterministic generation when an error is encountered.
+ * @param {{generatorKey: string, birthMonth: number, birthDay: number, birthYear: number, firstName: string, lastName: string}} request
+ * @param {Object} context Deterministic context built for the request.
+ * @param {string} apiKey Resolved OpenAI API key.
+ * @return {{drinkName: string, reason: string, ingredients: string[], instructions: string[], compatibility: string}}
+ * @private
+ */
+function generateDrinkWithOpenAI_(request, context, apiKey) {
+  const endpoint = 'https://api.openai.com/v1/chat/completions';
+  const prompt = buildOpenAiPrompt_(request, context);
+  const payload = {
+    model: 'gpt-4o-mini',
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: 'You are an award-winning mixologist creating bespoke cocktails. Respond using strict JSON with keys drinkName, reason, ingredients (array), instructions (array), compatibility.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: 'Bearer ' + apiKey,
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  };
+
+  logVerbose_('Dispatching OpenAI generation request.');
+  const httpResponse = UrlFetchApp.fetch(endpoint, options);
+  const status = httpResponse.getResponseCode();
+  const bodyText = httpResponse.getContentText();
+  logVerbose_('OpenAI HTTP response received.', { status: status });
+
+  if (status < 200 || status >= 300) {
+    throw new Error('OpenAI API returned status ' + status + ': ' + bodyText);
+  }
+
+  let responseObject;
+  try {
+    responseObject = JSON.parse(bodyText);
+  } catch (parseError) {
+    throw new Error('Failed to parse OpenAI response JSON: ' + parseError.message);
+  }
+
+  if (!responseObject.choices || !responseObject.choices.length) {
+    throw new Error('OpenAI response missing choices array.');
+  }
+
+  const content = responseObject.choices[0].message && responseObject.choices[0].message.content;
+  if (!content) {
+    throw new Error('OpenAI response missing message content.');
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (parseContentError) {
+    throw new Error('OpenAI message content is not valid JSON: ' + parseContentError.message);
+  }
+
+  return normalizeOpenAiBlueprint_(parsed, context);
+}
+
+/**
+ * Builds a structured prompt for the OpenAI API describing the requested drink.
+ * @param {{generatorKey: string, birthMonth: number, birthDay: number, birthYear: number, firstName: string, lastName: string}} request
+ * @param {Object} context Deterministic context created for the request.
+ * @return {string} Prompt string guiding the OpenAI response.
+ * @private
+ */
+function buildOpenAiPrompt_(request, context) {
+  const lines = [
+    'Create a cocktail concept inspired by the following individual details.',
+    'Generator label: ' + context.generatorLabel + '.',
+    'Name: ' + context.firstName + ' ' + context.lastName + '.',
+    'Birth date: ' + request.birthMonth + '/' + request.birthDay + '/' + request.birthYear + '.',
+    'Zodiac sign: ' + context.zodiac.sign + ' (' + context.zodiac.element + ').',
+    'Signature spirit: ' + context.zodiac.signatureSpirit + '.',
+    'Accent notes: ' + context.zodiac.accentNotes.join(', ') + '.',
+    'Garnish inspirations: ' + context.zodiac.garnishes.join(', ') + '.',
+    'Numerology value: ' + context.numerology + '.',
+    'Lineage inspiration: ' + context.lineage + '.',
+    'Deterministic seed: ' + context.seed + '.',
+    'Provide ingredients and instructions that can be executed at home.',
+    'Compatibility should be a friendly string summarizing why the drink suits the recipient.',
+  ];
+  return lines.join('\n');
+}
+
+/**
+ * Normalizes the OpenAI blueprint into the structure expected by the app.
+ * @param {Object} blueprint Raw blueprint returned by OpenAI.
+ * @param {Object} context Deterministic context used for fallback defaults.
+ * @return {{drinkName: string, reason: string, ingredients: string[], instructions: string[], compatibility: string}}
+ * @private
+ */
+function normalizeOpenAiBlueprint_(blueprint, context) {
+  const drinkName = blueprint && blueprint.drinkName ? String(blueprint.drinkName).trim() : context.firstName + ' Signature Sip';
+  const reason = blueprint && blueprint.reason ? String(blueprint.reason).trim() : 'A bespoke creation blending celestial and personal motifs.';
+  const ingredients = Array.isArray(blueprint && blueprint.ingredients)
+    ? blueprint.ingredients.map(function (entry) { return String(entry).trim(); })
+    : [];
+  const instructions = Array.isArray(blueprint && blueprint.instructions)
+    ? blueprint.instructions.map(function (entry) { return String(entry).trim(); })
+    : [];
+  const compatibility = blueprint && blueprint.compatibility ? String(blueprint.compatibility).trim() : 'Tailored compatibility insight unavailable.';
+
+  return {
+    drinkName: drinkName,
+    reason: reason,
+    ingredients: ingredients,
+    instructions: instructions,
+    compatibility: compatibility,
+  };
 }
 
 /**
