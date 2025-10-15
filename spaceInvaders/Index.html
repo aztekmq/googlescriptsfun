@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    #gameCanvas {
+      background: #111;
+      border: 2px solid #444;
+      display: block;
+      margin: 20px auto;
+      max-width: 100%;
+      height: auto;
+    }
+    #controls {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+    }
+    #controls button {
+      width: 60px;
+      height: 60px;
+      margin: 0 10px;
+      font-size: 24px;
+      border-radius: 50%;
+      border: none;
+      background: #333;
+      color: #fff;
+    }
+    #info {
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    #splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at top left, #ff0080, #000);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      animation: fadeIn 1s ease-out;
+    }
+    #splash h1 {
+      font-size: 48px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+      animation: glow 2s infinite alternate;
+    }
+    #splash p {
+      max-width: 300px;
+      line-height: 1.4;
+    }
+    #startBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 20px;
+      background: #222;
+      color: #0ff;
+      border: 2px solid #0ff;
+      border-radius: 10px;
+      cursor: pointer;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 10px #0ff; }
+      to { text-shadow: 0 0 20px #f0f; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Space Invaders</h1>
+  <canvas id="gameCanvas" width="480" height="320"></canvas>
+  <p id="info">Laptop: use ←/→ to move and Space to fire. Mobile: use the buttons below.</p>
+  <div id="controls">
+    <button id="leftBtn">◀️</button>
+    <button id="fireBtn">🔥</button>
+    <button id="rightBtn">▶️</button>
+  </div>
+  <div id="splash">
+    <h1>Space Invaders</h1>
+    <p>Laptop: use left/right arrows to move and the space bar to fire. On mobile, tap the buttons.</p>
+    <button id="startBtn">Start Game</button>
+  </div>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+
+    // Simple WebAudio sound manager (no external assets)
+    const Sound = {
+      ctx: null,
+      master: null,
+      init() {
+        if (this.ctx) return;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return; // Fallback: no audio support
+        this.ctx = new AudioCtx();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = 0.15;
+        this.master.connect(this.ctx.destination);
+      },
+      resume() {
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      },
+      tone({ freq = 440, type = 'square', duration = 0.08, volume = 0.4, glideTo = null, attack = 0.005, decay = 0.05 }) {
+        if (!this.ctx) return;
+        const t0 = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        if (glideTo) {
+          osc.frequency.setValueAtTime(freq, t0);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(1, glideTo), t0 + duration);
+        }
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(volume, t0 + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + Math.max(attack, decay) + duration);
+        osc.connect(gain).connect(this.master);
+        osc.start(t0);
+        osc.stop(t0 + duration + 0.1);
+      },
+      noise({ duration = 0.2, volume = 0.3, type = 'white' } = {}) {
+        if (!this.ctx) return;
+        const t0 = this.ctx.currentTime;
+        const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * (type === 'white' ? 1 : 1);
+        }
+        const src = this.ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(volume, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+        // Gentle lowpass for explosion texture
+        const lp = this.ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(1200, t0);
+        src.connect(lp).connect(gain).connect(this.master);
+        src.start(t0);
+        src.stop(t0 + duration + 0.05);
+      },
+      laser() {
+        // Classic short descending chirp
+        this.tone({ freq: 900, glideTo: 300, type: 'square', duration: 0.09, volume: 0.35 });
+      },
+      hit() {
+        // Small pop + tiny noise burst
+        this.tone({ freq: 180, type: 'triangle', duration: 0.05, volume: 0.25 });
+        this.noise({ duration: 0.08, volume: 0.15 });
+      },
+      explosion() {
+        // Beefier noise burst + falling tone
+        this.noise({ duration: 0.25, volume: 0.35 });
+        this.tone({ freq: 300, glideTo: 80, type: 'sawtooth', duration: 0.25, volume: 0.2 });
+      },
+      levelUp() {
+        // Upward arpeggio
+        const now = this.ctx ? this.ctx.currentTime : 0;
+        const seq = [523.25, 659.25, 783.99];
+        seq.forEach((f, i) => setTimeout(() => this.tone({ freq: f, type: 'square', duration: 0.08, volume: 0.25 }), i * 90));
+      },
+      win() {
+        const seq = [587.33, 698.46, 880.0, 1174.66];
+        seq.forEach((f, i) => setTimeout(() => this.tone({ freq: f, type: 'square', duration: 0.1, volume: 0.28 }), i * 120));
+      },
+      gameOver() {
+        // Low descending tone
+        this.tone({ freq: 200, glideTo: 60, type: 'square', duration: 0.5, volume: 0.25 });
+      },
+      start() {
+        // Tiny blip to confirm start
+        this.tone({ freq: 880, type: 'square', duration: 0.05, volume: 0.2 });
+      }
+    };
+
+    // Level and alien sprite data
+    const alienSprites = ['👾', '👽', '🤖', '👹', '👻'];
+    let level = 1;
+    let currentSprite = alienSprites[level - 1];
+
+    // Game objects
+    const player = { x: canvas.width / 2 - 15, y: canvas.height - 30, w: 30, h: 10, speed: 5 };
+    const bullets = [];
+    const aliens = [];
+    const alienRows = 4, alienCols = 8;
+    const alienSpacing = 40;
+    let alienDirection = 1;
+    let gameOver = false;
+    let victory = false;
+    let score = 0;
+
+    function initAliens() {
+      aliens.length = 0;
+      for (let row = 0; row < alienRows; row++) {
+        for (let col = 0; col < alienCols; col++) {
+          aliens.push({
+            x: 30 + col * alienSpacing,
+            y: 30 + row * alienSpacing,
+            w: 30,
+            h: 20,
+            alive: true
+          });
+        }
+      }
+    }
+    initAliens();
+
+    // Keyboard and touch controls
+    const keys = {};
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
+
+    function setKey(key, pressed) {
+      keys[key] = pressed;
+    }
+    const touchMap = [
+      { id: 'leftBtn', key: 'ArrowLeft' },
+      { id: 'rightBtn', key: 'ArrowRight' },
+      { id: 'fireBtn', key: 'Space' }
+    ];
+    touchMap.forEach(({ id, key }) => {
+      const btn = document.getElementById(id);
+      btn.addEventListener('touchstart', e => { e.preventDefault(); setKey(key, true); });
+      btn.addEventListener('touchend', e => { e.preventDefault(); setKey(key, false); });
+    });
+
+    function update() {
+      if (gameOver) return;
+
+      // Move player
+      if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+      if (keys['ArrowRight'] && player.x < canvas.width - player.w) player.x += player.speed;
+      if (keys['Space']) {
+        if (!bullets.some(b => b.y > player.y - 20)) {
+          bullets.push({ x: player.x + player.w / 2 - 2, y: player.y, h: 10 });
+          Sound.laser();
+        }
+      }
+
+      // Move bullets
+      bullets.forEach(b => b.y -= 7);
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        if (bullets[i].y < 0) bullets.splice(i, 1);
+      }
+
+      // Move aliens
+      let shiftDown = false;
+      aliens.forEach(a => {
+        if (!a.alive) return;
+        a.x += alienDirection;
+        if (a.x < 0 || a.x + a.w > canvas.width) shiftDown = true;
+      });
+      if (shiftDown) {
+        alienDirection *= -1;
+        aliens.forEach(a => {
+          a.y += 10;
+          if (a.y + a.h >= player.y && !gameOver) {
+            gameOver = true;
+            Sound.gameOver();
+          }
+        });
+      }
+
+      // Bullet-alien collision
+      bullets.forEach((b, bi) => {
+        aliens.forEach(a => {
+          if (!a.alive) return;
+          if (b.x < a.x + a.w && b.x + 4 > a.x && b.y < a.y + a.h && b.y + b.h > a.y) {
+            a.alive = false;
+            bullets.splice(bi, 1);
+            score += 10;
+            // Early levels: a small hit; later levels: stronger explosion
+            if (level < 3) {
+              Sound.hit();
+            } else {
+              Sound.explosion();
+            }
+          }
+        });
+      });
+      // Check win and advance levels
+      if (aliens.every(a => !a.alive)) {
+        if (level < alienSprites.length) {
+          level++;
+          currentSprite = alienSprites[level - 1];
+          alienDirection = 1;
+          bullets.length = 0;
+          initAliens();
+          Sound.levelUp();
+        } else {
+          gameOver = true;
+          victory = true;
+          Sound.win();
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Player
+      ctx.fillStyle = '#0f0';
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+
+      // Bullets
+      ctx.fillStyle = '#ff0';
+      bullets.forEach(b => ctx.fillRect(b.x, b.y, 4, b.h));
+
+      // Aliens
+      ctx.font = '20px Arial';
+      aliens.forEach(a => {
+        if (a.alive) ctx.fillText(currentSprite, a.x, a.y);
+      });
+
+      // Score and level
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText('Score: ' + score + ' Level: ' + level, 10, 20);
+
+      if (gameOver) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '24px Arial';
+        const msg = victory ? 'You Win!' : 'Game Over';
+        ctx.fillText(msg, canvas.width / 2 - ctx.measureText(msg).width / 2, canvas.height / 2 - 12);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+      document.getElementById('splash').style.display = 'none';
+      // Initialize and resume audio on user gesture
+      Sound.init();
+      Sound.resume();
+      Sound.start();
+      loop();
+    }
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('startBtn').addEventListener('touchstart', e => { e.preventDefault(); startGame(); });
+  </script>
+</body>
+</html>
