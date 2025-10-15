@@ -1,259 +1,1007 @@
 <!DOCTYPE html>
 <!--
-  @fileoverview Front-end interface for the Cocktail Picker web application.
-  Provides a form for collecting cocktail preferences and requests recommendations from the
-  Google Apps Script backend which now uses the OpenAI API. Verbose client-side logging is
-  included to assist with debugging across international development teams.
+  @fileoverview Front-end interface for the Mythic Mixology Lab. Provides
+  age verification, generator selection, search catalogue, and vote handling
+  with verbose logging for collaborative international teams.
 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cocktail Picker</title>
+    <title>Mythic Mixology Lab</title>
     <style>
       :root {
-        color-scheme: light dark;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color-scheme: dark;
+        font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif;
+        --bg-gradient: linear-gradient(135deg, #140f2d, #2f2354 45%, #512d6d);
+        --accent-gradient: linear-gradient(135deg, #ff8a5c, #fd3a69);
+        --card-bg: rgba(24, 22, 48, 0.85);
+        --card-border: rgba(255, 255, 255, 0.12);
+        --text-primary: #f5f6ff;
+        --text-muted: rgba(245, 246, 255, 0.68);
+        --danger: #ff6b6b;
+        --success: #5cfdb2;
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
         margin: 0;
-        background: linear-gradient(135deg, #1e1e2f, #3d2c8d);
-        color: #f1f1f1;
         min-height: 100vh;
+        background: var(--bg-gradient);
+        color: var(--text-primary);
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 32px;
+        padding: clamp(16px, 3vw, 48px);
+        position: relative;
       }
 
-      .container {
-        width: min(720px, 100%);
-        background-color: rgba(24, 24, 34, 0.9);
-        border-radius: 16px;
-        padding: 32px;
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(14px);
+      h1,
+      h2,
+      h3 {
+        font-weight: 600;
+        margin: 0;
       }
 
-      h1 {
-        font-size: 2.25rem;
-        margin-bottom: 12px;
-        font-weight: 700;
+      p {
+        margin: 0;
+        color: var(--text-muted);
       }
 
-      p.description {
+      button,
+      .button-link {
+        cursor: pointer;
+        border: none;
+        padding: 14px 24px;
+        border-radius: 999px;
+        background: var(--accent-gradient);
+        color: #1f0f2d;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+
+      button:hover,
+      .button-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 36px rgba(253, 58, 105, 0.35);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .app-shell {
+        width: min(1080px, 100%);
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 24px;
+        padding: clamp(24px, 3vw, 40px);
+        box-shadow: 0 30px 60px rgba(10, 6, 29, 0.55);
+        display: none;
+        position: relative;
+      }
+
+      .app-shell.active {
+        display: block;
+      }
+
+      .top-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 24px;
-        line-height: 1.6;
+      }
+
+      .home-button {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        border-radius: 999px;
+        padding: 10px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(12px);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .home-button:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .view {
+        display: none;
+        animation: fadeIn 0.4s ease;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .hero-card {
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 20px;
+        padding: clamp(28px, 4vw, 42px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        justify-content: center;
+        margin-top: 28px;
       }
 
       form {
         display: grid;
-        gap: 20px;
+        gap: 18px;
       }
 
       label {
         display: block;
-        font-weight: 600;
         margin-bottom: 8px;
+        font-weight: 500;
       }
 
+      select,
       input,
-      textarea,
-      select {
+      textarea {
         width: 100%;
-        padding: 12px;
-        border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background-color: rgba(10, 10, 20, 0.6);
-        color: inherit;
-        font-size: 1rem;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(15, 12, 35, 0.65);
+        color: var(--text-primary);
+        font-size: 0.97rem;
         transition: border 0.2s ease, box-shadow 0.2s ease;
       }
 
+      select:focus,
       input:focus,
-      textarea:focus,
-      select:focus {
+      textarea:focus {
         outline: none;
-        border-color: #ff9d2f;
-        box-shadow: 0 0 0 3px rgba(255, 157, 47, 0.3);
+        border-color: rgba(253, 58, 105, 0.7);
+        box-shadow: 0 0 0 2px rgba(253, 58, 105, 0.2);
       }
 
-      button {
-        cursor: pointer;
-        padding: 14px 22px;
-        border-radius: 999px;
-        border: none;
-        font-weight: 600;
-        font-size: 1rem;
-        background: linear-gradient(135deg, #ff9d2f, #ff3f81);
-        color: #14141f;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      .field-invalid {
+        border-color: var(--danger) !important;
+        box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.3) !important;
       }
 
-      button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 20px rgba(255, 63, 129, 0.35);
+      .form-grid {
+        display: grid;
+        gap: 18px;
       }
 
-      .result {
-        margin-top: 32px;
+      @media (min-width: 720px) {
+        .form-grid.two-column {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .result-card {
+        margin-top: 28px;
         padding: 24px;
-        border-radius: 12px;
-        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        line-height: 1.7;
         display: none;
       }
 
-      .result.active {
+      .result-card.active {
         display: block;
       }
 
-      .result h2 {
-        margin-top: 0;
+      .result-card h2 {
         font-size: 1.8rem;
+        margin-bottom: 12px;
       }
 
-      ul.ingredients {
-        padding-left: 24px;
-        margin-top: 10px;
+      .result-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+        color: var(--success);
+        font-weight: 600;
       }
 
-      .error {
-        color: #ff9d2f;
-        margin-top: 16px;
+      ul.styled-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 8px;
+      }
+
+      ul.styled-list li::before {
+        content: '\2022';
+        margin-right: 10px;
+        color: #fd3a69;
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 16px 20px;
+        background: rgba(15, 12, 35, 0.92);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+        display: none;
+        min-width: 280px;
+      }
+
+      .toast.active {
+        display: block;
+      }
+
+      .search-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .search-controls input {
+        flex: 1;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(12, 10, 26, 0.7);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+
+      thead {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      th,
+      td {
+        padding: 14px;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      th button {
+        background: none;
+        color: inherit;
+        padding: 0;
+        font: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      .table-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .ghost-button {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        padding: 10px 16px;
+      }
+
+      .detail-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 8, 24, 0.85);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 20;
+      }
+
+      .detail-overlay.active {
+        display: flex;
+      }
+
+      .detail-card {
+        width: min(520px, 100%);
+        background: rgba(19, 17, 44, 0.95);
+        border-radius: 20px;
+        padding: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .age-gate {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 6, 20, 0.94);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 30;
+        padding: 24px;
+      }
+
+      .age-card {
+        background: rgba(25, 21, 48, 0.92);
+        padding: 32px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        width: min(420px, 100%);
+        text-align: center;
+        box-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
+      }
+
+      .age-card h2 {
+        margin-bottom: 12px;
+      }
+
+      .age-card form {
+        margin-top: 24px;
+      }
+
+      .age-error {
+        color: var(--danger);
+        margin-top: 12px;
         display: none;
       }
 
-      .error.active {
+      .age-error.active {
         display: block;
+      }
+
+      .status-text {
+        color: var(--text-muted);
+        font-size: 0.9rem;
       }
     </style>
   </head>
   <body>
-    <main class="container">
-      <header>
-        <h1>Cocktail Picker</h1>
-        <p class="description">
-          Provide a few details about your desired cocktail and we will consult OpenAI's mixology
-          expertise for a personalised recipe.
-        </p>
+    <section class="age-gate" id="ageGate" role="dialog" aria-modal="true">
+      <div class="age-card">
+        <h2>Age Verification</h2>
+        <p>Please confirm your date of birth. You must be 21 years or older to enter the Mythic Mixology Lab.</p>
+        <form id="ageForm" autocomplete="off">
+          <label for="birthDate">Birthdate</label>
+          <input id="birthDate" name="birthDate" type="date" required aria-required="true" />
+          <button type="submit" style="margin-top: 18px">Let Me In</button>
+          <div class="age-error" id="ageError">You must be 21 years or older to continue.</div>
+        </form>
+      </div>
+    </section>
+
+    <main class="app-shell" id="appShell" aria-live="polite">
+      <header class="top-nav">
+        <button class="home-button" id="homeButton" type="button" aria-label="Return to main home page">
+          <span>⟵</span>
+          <span>Main Constellation</span>
+        </button>
+        <div>
+          <span class="status-text" id="userSignature"></span>
+        </div>
       </header>
 
-      <form id="cocktail-form" autocomplete="off">
-        <div class="field">
-          <label for="baseSpirit">Preferred base spirit</label>
-          <select id="baseSpirit" name="baseSpirit" required>
-            <option value="">Select a spirit</option>
-            <option value="vodka">Vodka</option>
-            <option value="gin">Gin</option>
-            <option value="rum">Rum</option>
-            <option value="tequila">Tequila</option>
-            <option value="whisky">Whisky</option>
-            <option value="brandy">Brandy</option>
-            <option value="mezcal">Mezcal</option>
-            <option value="non-alcoholic">Non-alcoholic</option>
-          </select>
+      <section class="view active" id="homeView">
+        <div class="hero-card">
+          <h1>Mythic Mixology Lab</h1>
+          <p>
+            Choose your destiny: conjure new cosmic cocktails or explore the catalog of community creations.
+            Every action is logged with verbose precision for our global team.
+          </p>
+          <div class="hero-actions">
+            <button id="newDrinkButton" type="button">Create New Drinks</button>
+            <button id="searchButton" type="button" class="ghost-button">Search Existing</button>
+          </div>
         </div>
+      </section>
 
-        <div class="field">
-          <label for="flavorProfile">Flavour profile</label>
-          <input
-            id="flavorProfile"
-            name="flavorProfile"
-            placeholder="e.g., refreshing, citrus-forward, herbaceous"
-            required
-          />
+      <section class="view" id="createView" aria-labelledby="createHeading">
+        <h2 id="createHeading">Create a Destiny Drink</h2>
+        <p style="margin-bottom: 18px">Complete the fields below and let fate infuse your glass.</p>
+        <form id="createForm">
+          <div>
+            <label for="generatorKey">Choose your generator</label>
+            <select id="generatorKey" name="generatorKey" required>
+              <option value="">Select a celestial engine</option>
+              <option value="astro">Astrological Elixir Generator</option>
+              <option value="numerology">Name Numerology Mixer</option>
+              <option value="chrono">Birthday Chrono-Cocktail</option>
+              <option value="oracle">Personalized Palate Oracle</option>
+              <option value="dynasty">Dynastic Drink Dynasty</option>
+            </select>
+          </div>
+          <div class="form-grid two-column">
+            <div>
+              <label for="birthMonth">Birth month</label>
+              <select id="birthMonth" name="birthMonth" required></select>
+            </div>
+            <div>
+              <label for="birthDay">Birth day</label>
+              <input id="birthDay" name="birthDay" type="number" min="1" max="31" required />
+            </div>
+          </div>
+          <div class="form-grid two-column">
+            <div>
+              <label for="firstName">First name</label>
+              <input id="firstName" name="firstName" type="text" required />
+            </div>
+            <div>
+              <label for="lastName">Last name</label>
+              <input id="lastName" name="lastName" type="text" required />
+            </div>
+          </div>
+          <button type="submit" id="generateButton">Generate</button>
+        </form>
+
+        <article class="result-card" id="resultCard">
+          <h2 id="resultName"></h2>
+          <div class="result-meta" id="resultMeta"></div>
+          <p id="resultReason" style="margin-bottom: 18px"></p>
+          <h3>Ingredients</h3>
+          <ul class="styled-list" id="resultIngredients"></ul>
+          <h3 style="margin-top: 20px">Instructions</h3>
+          <ul class="styled-list" id="resultInstructions"></ul>
+        </article>
+      </section>
+
+      <section class="view" id="searchView" aria-labelledby="searchHeading">
+        <h2 id="searchHeading">Explore the Archive</h2>
+        <p style="margin-bottom: 20px">Filter, sort, vote, and dive into detailed notes from every generated beverage.</p>
+        <div class="search-controls">
+          <input id="searchInput" type="search" placeholder="Filter by drink name, generator, or reason" />
+          <button id="refreshButton" type="button" class="ghost-button">Refresh Archive</button>
         </div>
-
-        <div class="field">
-          <label for="additionalNotes">Additional guidance</label>
-          <textarea
-            id="additionalNotes"
-            name="additionalNotes"
-            rows="3"
-            placeholder="Occasion, desired difficulty, equipment limits, or dietary needs"
-          ></textarea>
+        <div class="table-container">
+          <table aria-live="polite">
+            <thead>
+              <tr>
+                <th><button type="button" data-sort="drinkName">Drink</button></th>
+                <th><button type="button" data-sort="generatorLabel">Generator</button></th>
+                <th><button type="button" data-sort="compatibility">Alignment</button></th>
+                <th><button type="button" data-sort="voteCount">Votes</button></th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="drinksTableBody"></tbody>
+          </table>
         </div>
-
-        <button type="submit">Request Recommendation</button>
-      </form>
-
-      <section id="error" class="error" role="alert"></section>
-
-      <section id="result" class="result" aria-live="polite"></section>
+      </section>
     </main>
+
+    <section class="detail-overlay" id="detailOverlay" role="dialog" aria-modal="true">
+      <div class="detail-card">
+        <h2 id="detailName"></h2>
+        <p id="detailMeta" style="margin: 12px 0"></p>
+        <p id="detailReason" style="margin-bottom: 16px"></p>
+        <h3>Ingredients</h3>
+        <ul class="styled-list" id="detailIngredients"></ul>
+        <h3 style="margin-top: 18px">Instructions</h3>
+        <ul class="styled-list" id="detailInstructions"></ul>
+        <button type="button" class="ghost-button" id="closeDetailButton" style="margin-top: 20px">Close</button>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" role="status"></div>
 
     <script>
       /**
-       * @fileoverview Handles client-side form submission and renders responses from the Apps Script backend.
+       * @fileoverview Client-side controller for view management, validation,
+       * Apps Script communication, and dynamic rendering with verbose logging.
        */
       (function () {
-        const form = document.getElementById('cocktail-form');
-        const resultContainer = document.getElementById('result');
-        const errorContainer = document.getElementById('error');
+        /** @type {{birthDate: string|null, birthYear: number|null}} */
+        const userSession = {
+          birthDate: null,
+          birthYear: null,
+        };
+
+        /** @type {Array<Object>} */
+        let cachedDrinks = [];
+        let currentSort = { key: 'drinkName', direction: 'asc' };
+        const scriptRunner = typeof google !== 'undefined' && google.script && google.script.run ? google.script.run : null;
+
+        // Element references -------------------------------------------------
+        const ageGate = document.getElementById('ageGate');
+        const ageForm = document.getElementById('ageForm');
+        const ageError = document.getElementById('ageError');
+        const birthDateInput = document.getElementById('birthDate');
+        const appShell = document.getElementById('appShell');
+        const homeButton = document.getElementById('homeButton');
+        const homeView = document.getElementById('homeView');
+        const createView = document.getElementById('createView');
+        const searchView = document.getElementById('searchView');
+        const newDrinkButton = document.getElementById('newDrinkButton');
+        const searchButton = document.getElementById('searchButton');
+        const createForm = document.getElementById('createForm');
+        const generatorSelect = document.getElementById('generatorKey');
+        const birthMonthSelect = document.getElementById('birthMonth');
+        const birthDayInput = document.getElementById('birthDay');
+        const firstNameInput = document.getElementById('firstName');
+        const lastNameInput = document.getElementById('lastName');
+        const generateButton = document.getElementById('generateButton');
+        const resultCard = document.getElementById('resultCard');
+        const resultName = document.getElementById('resultName');
+        const resultMeta = document.getElementById('resultMeta');
+        const resultReason = document.getElementById('resultReason');
+        const resultIngredients = document.getElementById('resultIngredients');
+        const resultInstructions = document.getElementById('resultInstructions');
+        const searchInput = document.getElementById('searchInput');
+        const refreshButton = document.getElementById('refreshButton');
+        const drinksTableBody = document.getElementById('drinksTableBody');
+        const detailOverlay = document.getElementById('detailOverlay');
+        const detailName = document.getElementById('detailName');
+        const detailMeta = document.getElementById('detailMeta');
+        const detailReason = document.getElementById('detailReason');
+        const detailIngredients = document.getElementById('detailIngredients');
+        const detailInstructions = document.getElementById('detailInstructions');
+        const closeDetailButton = document.getElementById('closeDetailButton');
+        const toast = document.getElementById('toast');
+        const userSignature = document.getElementById('userSignature');
 
         /**
-         * Displays the cocktail recommendation in a human-friendly format.
-         * @param {{name: string, description: string, ingredients: string[], preparation: string, garnish: string}} suggestion
+         * Populates month select options in an internationally friendly manner.
          */
-        function renderSuggestion(suggestion) {
-          console.info('[CocktailPicker] Rendering suggestion', suggestion);
-          const ingredientItems = suggestion.ingredients
-            .map((ingredient) => `<li>${ingredient}</li>`)
-            .join('');
-
-          resultContainer.innerHTML = `
-            <h2>${suggestion.name}</h2>
-            <p>${suggestion.description}</p>
-            <h3>Ingredients</h3>
-            <ul class="ingredients">${ingredientItems}</ul>
-            <h3>Preparation</h3>
-            <p>${suggestion.preparation}</p>
-            <h3>Suggested garnish</h3>
-            <p>${suggestion.garnish}</p>
-          `;
-          resultContainer.classList.add('active');
+        function populateMonths() {
+          const monthNames = [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December',
+          ];
+          birthMonthSelect.innerHTML = '<option value="">Select month</option>';
+          monthNames.forEach(function (name, index) {
+            const option = document.createElement('option');
+            option.value = String(index + 1);
+            option.textContent = name;
+            birthMonthSelect.appendChild(option);
+          });
         }
 
         /**
-         * Reports errors to the user while keeping the console log verbose for debugging.
-         * @param {string} message
+         * Invokes Apps Script backend methods with graceful fallbacks.
+         * @param {string} methodName Method to invoke.
+         * @param {*} payload Payload for the method.
+         * @param {Function} onSuccess Success callback.
+         * @param {Function} onFailure Failure callback.
          */
-        function reportError(message) {
-          console.error('[CocktailPicker] Error encountered', message);
-          errorContainer.textContent = message;
-          errorContainer.classList.add('active');
+        function invokeServer(methodName, payload, onSuccess, onFailure) {
+          if (!scriptRunner) {
+            console.warn('[invokeServer] Apps Script runner unavailable; offline preview mode.');
+            if (typeof onFailure === 'function') {
+              onFailure(new Error('Apps Script interface unavailable in preview mode.'));
+            }
+            return;
+          }
+
+          var runner = scriptRunner.withSuccessHandler(onSuccess || function () {});
+          if (typeof onFailure === 'function') {
+            runner = runner.withFailureHandler(onFailure);
+          }
+
+          if (payload === undefined) {
+            runner[methodName]();
+          } else {
+            runner[methodName](payload);
+          }
         }
 
-        form.addEventListener('submit', (event) => {
+        /**
+         * Displays a toast notification with verbose logging.
+         * @param {string} message Message to display.
+         */
+        function showToast(message) {
+          console.log('[Toast]', message);
+          toast.textContent = message;
+          toast.classList.add('active');
+          setTimeout(function () {
+            toast.classList.remove('active');
+          }, 3800);
+        }
+
+        /**
+         * Switches the active view while maintaining the elegant navigation.
+         * @param {HTMLElement} targetView Target section to reveal.
+         */
+        function switchView(targetView) {
+          [homeView, createView, searchView].forEach(function (view) {
+            view.classList.remove('active');
+          });
+          targetView.classList.add('active');
+        }
+
+        /**
+         * Validates the age gate entry and unlocks the experience.
+         * @param {Event} event Submission event.
+         */
+        function handleAgeGate(event) {
           event.preventDefault();
-          console.debug('[CocktailPicker] Form submission intercepted. Preparing payload.');
+          const value = birthDateInput.value;
+          if (!value) {
+            ageError.textContent = 'Please provide your birthdate to proceed.';
+            ageError.classList.add('active');
+            return;
+          }
 
-          resultContainer.classList.remove('active');
-          errorContainer.classList.remove('active');
+          const birthDate = new Date(value + 'T00:00:00');
+          const today = new Date();
+          const age = today.getFullYear() - birthDate.getFullYear();
+          const hasHadBirthday =
+            today.getMonth() > birthDate.getMonth() ||
+            (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+          const computedAge = hasHadBirthday ? age : age - 1;
 
-          const formData = {
-            baseSpirit: form.baseSpirit.value,
-            flavorProfile: form.flavorProfile.value,
-            additionalNotes: form.additionalNotes.value,
+          if (computedAge < 21) {
+            ageError.textContent = 'You must be 21 years or older to continue.';
+            ageError.classList.add('active');
+            return;
+          }
+
+          ageError.classList.remove('active');
+          userSession.birthDate = value;
+          userSession.birthYear = birthDate.getFullYear();
+          userSignature.textContent = 'Verified: ' + value;
+          ageGate.style.display = 'none';
+          appShell.classList.add('active');
+          switchView(homeView);
+          showToast('Welcome to the Mythic Mixology Lab. Logging activated.');
+        }
+
+        /**
+         * Removes invalid highlighting for corrected fields.
+         * @param {HTMLElement} element Field element.
+         */
+        function clearInvalid(element) {
+          element.classList.remove('field-invalid');
+        }
+
+        /**
+         * Applies invalid styling and navigates to the field.
+         * @param {HTMLElement} element Field element.
+         */
+        function markInvalid(element) {
+          element.classList.add('field-invalid');
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus({ preventScroll: true });
+        }
+
+        /**
+         * Collects and validates form data prior to generation.
+         * @return {{generatorKey: string, birthMonth: number, birthDay: number, firstName: string, lastName: string}|null}
+         */
+        function collectFormData() {
+          const fields = [generatorSelect, birthMonthSelect, birthDayInput, firstNameInput, lastNameInput];
+          let firstInvalid = null;
+          fields.forEach(function (field) {
+            clearInvalid(field);
+            if (!field.value) {
+              firstInvalid = firstInvalid || field;
+            }
+          });
+
+          const dayValue = Number(birthDayInput.value);
+          if (!Number.isInteger(dayValue) || dayValue < 1 || dayValue > 31) {
+            firstInvalid = firstInvalid || birthDayInput;
+          }
+
+          if (firstInvalid) {
+            markInvalid(firstInvalid);
+            return null;
+          }
+
+          if (!userSession.birthYear) {
+            showToast('Age verification required before generation.');
+            return null;
+          }
+
+          return {
+            generatorKey: generatorSelect.value,
+            birthMonth: Number(birthMonthSelect.value),
+            birthDay: dayValue,
+            birthYear: userSession.birthYear,
+            firstName: firstNameInput.value.trim(),
+            lastName: lastNameInput.value.trim(),
           };
+        }
 
-          console.debug('[CocktailPicker] Dispatching preferences to server.', formData);
-          google.script.run
-            .withSuccessHandler((suggestion) => {
-              console.debug('[CocktailPicker] Suggestion received from server.', suggestion);
-              renderSuggestion(suggestion);
-            })
-            .withFailureHandler((error) => {
-              console.error('[CocktailPicker] Server returned an error.', error);
-              reportError(
-                'We were unable to retrieve a cocktail suggestion. Please review the logs or try again shortly.'
-              );
-            })
-            .getCocktailSuggestion(formData);
+        /**
+         * Handles generator form submission by invoking the Apps Script backend.
+         * @param {Event} event Submission event.
+         */
+        function handleGenerate(event) {
+          event.preventDefault();
+          const data = collectFormData();
+          if (!data) {
+            return;
+          }
+
+          generateButton.disabled = true;
+          showToast('Contacting celestial servers...');
+
+          invokeServer(
+            'generateDrink',
+            data,
+            function (response) {
+              console.log('[generateDrink success]', response);
+              generateButton.disabled = false;
+              renderResult(response);
+              cachedDrinks.push(response);
+              renderTable();
+              showToast('Drink generated and stored successfully.');
+            },
+            function (error) {
+              console.error('[generateDrink failure]', error);
+              generateButton.disabled = false;
+              showToast('Generation failed: ' + error.message);
+            }
+          );
+        }
+
+        /**
+         * Renders the generated drink card with aesthetic formatting.
+         * @param {{drinkName: string, reason: string, ingredients: string[], instructions: string[], compatibility: string, generatorLabel: string}} payload
+         */
+        function renderResult(payload) {
+          resultName.textContent = payload.drinkName;
+          resultMeta.textContent = payload.compatibility + ' • ' + payload.generatorLabel;
+          resultReason.textContent = payload.reason;
+          resultIngredients.innerHTML = '';
+          resultInstructions.innerHTML = '';
+
+          payload.ingredients.forEach(function (ingredient) {
+            const li = document.createElement('li');
+            li.textContent = ingredient;
+            resultIngredients.appendChild(li);
+          });
+
+          payload.instructions.forEach(function (instruction) {
+            const li = document.createElement('li');
+            li.textContent = instruction;
+            resultInstructions.appendChild(li);
+          });
+
+          resultCard.classList.add('active');
+        }
+
+        /**
+         * Fetches drinks from the backend and updates the table cache.
+         */
+        function fetchDrinks() {
+          showToast('Refreshing archive from sheet...');
+          invokeServer(
+            'getStoredDrinks',
+            undefined,
+            function (records) {
+              console.log('[getStoredDrinks success]', records);
+              cachedDrinks = records;
+              renderTable();
+              showToast('Archive synchronized.');
+            },
+            function (error) {
+              console.error('[getStoredDrinks failure]', error);
+              showToast('Unable to retrieve drinks: ' + error.message);
+            }
+          );
+        }
+
+        /**
+         * Applies search and sort to cached drinks and renders the table body.
+         */
+        function renderTable() {
+          const filter = (searchInput.value || '').toLowerCase();
+          const filtered = cachedDrinks.filter(function (drink) {
+            const composite = [drink.drinkName, drink.generatorLabel, drink.reason, drink.compatibility]
+              .join(' ')
+              .toLowerCase();
+            return composite.indexOf(filter) !== -1;
+          });
+
+          filtered.sort(function (a, b) {
+            const key = currentSort.key;
+            const direction = currentSort.direction === 'asc' ? 1 : -1;
+            if (key === 'voteCount') {
+              const numA = Number(a.voteCount || 0);
+              const numB = Number(b.voteCount || 0);
+              return numA === numB ? 0 : numA < numB ? -1 * direction : 1 * direction;
+            }
+            const valueA = (a[key] || '').toString().toLowerCase();
+            const valueB = (b[key] || '').toString().toLowerCase();
+            if (valueA < valueB) return -1 * direction;
+            if (valueA > valueB) return 1 * direction;
+            return 0;
+          });
+
+          drinksTableBody.innerHTML = '';
+          if (!filtered.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 5;
+            cell.textContent = 'No drinks found. Generate one to begin the dynasty!';
+            row.appendChild(cell);
+            drinksTableBody.appendChild(row);
+            return;
+          }
+
+          filtered.forEach(function (drink) {
+            const row = document.createElement('tr');
+            row.innerHTML = [
+              '<td>' + drink.drinkName + '</td>',
+              '<td>' + drink.generatorLabel + '</td>',
+              '<td>' + drink.compatibility + '</td>',
+              '<td>' + (drink.voteCount || 0) + '</td>',
+              '<td class="table-actions"></td>',
+            ].join('');
+
+            const actionsCell = row.querySelector('.table-actions');
+            const detailBtn = document.createElement('button');
+            detailBtn.type = 'button';
+            detailBtn.className = 'ghost-button';
+            detailBtn.textContent = 'View Details';
+            detailBtn.addEventListener('click', function () {
+              openDetail(drink);
+            });
+
+            const voteBtn = document.createElement('button');
+            voteBtn.type = 'button';
+            voteBtn.textContent = 'Vote';
+            voteBtn.addEventListener('click', function () {
+              handleVote(drink, voteBtn, row);
+            });
+
+            actionsCell.appendChild(detailBtn);
+            actionsCell.appendChild(voteBtn);
+            drinksTableBody.appendChild(row);
+          });
+        }
+
+        /**
+         * Opens the detail modal with comprehensive drink information.
+         * @param {Object} drink Drink record.
+         */
+        function openDetail(drink) {
+          detailName.textContent = drink.drinkName;
+          detailMeta.textContent = drink.generatorLabel + ' • ' + drink.compatibility;
+          detailReason.textContent = drink.reason;
+          detailIngredients.innerHTML = '';
+          detailInstructions.innerHTML = '';
+
+          (drink.ingredients || []).forEach(function (ingredient) {
+            const li = document.createElement('li');
+            li.textContent = ingredient;
+            detailIngredients.appendChild(li);
+          });
+
+          (drink.instructions || []).forEach(function (instruction) {
+            const li = document.createElement('li');
+            li.textContent = instruction;
+            detailInstructions.appendChild(li);
+          });
+
+          detailOverlay.classList.add('active');
+        }
+
+        /**
+         * Handles closing the detail modal.
+         */
+        function closeDetail() {
+          detailOverlay.classList.remove('active');
+        }
+
+        /**
+         * Sends a vote request to the backend and updates the UI.
+         * @param {Object} drink Drink record being voted on.
+         * @param {HTMLButtonElement} button The vote button.
+         * @param {HTMLTableRowElement} row Table row for updating counts.
+         */
+        function handleVote(drink, button, row) {
+          button.disabled = true;
+          invokeServer(
+            'registerVote',
+            drink.drinkId,
+            function (result) {
+              console.log('[registerVote success]', result);
+              button.disabled = false;
+              drink.voteCount = result.voteCount;
+              const voteCell = row.querySelector('td:nth-child(4)');
+              if (voteCell) {
+                voteCell.textContent = result.voteCount;
+              }
+              showToast('Vote tallied for ' + drink.drinkName + '.');
+            },
+            function (error) {
+              console.error('[registerVote failure]', error);
+              button.disabled = false;
+              showToast('Unable to register vote: ' + error.message);
+            }
+          );
+        }
+
+        /**
+         * Handles table header sorting interactions.
+         * @param {MouseEvent} event Click event.
+         */
+        function handleSort(event) {
+          const key = event.target.getAttribute('data-sort');
+          if (!key) {
+            return;
+          }
+          currentSort.direction = currentSort.key === key && currentSort.direction === 'asc' ? 'desc' : 'asc';
+          currentSort.key = key;
+          renderTable();
+        }
+
+        // Event wiring -------------------------------------------------------
+        ageForm.addEventListener('submit', handleAgeGate);
+        homeButton.addEventListener('click', function () {
+          switchView(homeView);
         });
+        newDrinkButton.addEventListener('click', function () {
+          switchView(createView);
+        });
+        searchButton.addEventListener('click', function () {
+          switchView(searchView);
+          fetchDrinks();
+        });
+        refreshButton.addEventListener('click', fetchDrinks);
+        createForm.addEventListener('submit', handleGenerate);
+        searchInput.addEventListener('input', renderTable);
+        closeDetailButton.addEventListener('click', closeDetail);
+        detailOverlay.addEventListener('click', function (event) {
+          if (event.target === detailOverlay) {
+            closeDetail();
+          }
+        });
+        document.querySelectorAll('th button[data-sort]').forEach(function (button) {
+          button.addEventListener('click', handleSort);
+        });
+
+        [generatorSelect, birthMonthSelect, birthDayInput, firstNameInput, lastNameInput].forEach(function (field) {
+          field.addEventListener('input', function () {
+            clearInvalid(field);
+          });
+        });
+
+        populateMonths();
       })();
     </script>
   </body>
