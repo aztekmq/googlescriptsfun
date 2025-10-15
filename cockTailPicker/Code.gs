@@ -174,12 +174,25 @@ function generateDrinkWithOpenAI_(request, context, apiKey) {
   };
 
   logVerbose_('Dispatching OpenAI generation request.');
-  const httpResponse = UrlFetchApp.fetch(endpoint, options);
+  let httpResponse;
+  try {
+    httpResponse = UrlFetchApp.fetch(endpoint, options);
+  } catch (fetchError) {
+    logVerbose_('OpenAI HTTP request failed prior to receiving a response.', {
+      message: fetchError && fetchError.message ? fetchError.message : 'Unknown error',
+      stack: fetchError && fetchError.stack ? String(fetchError.stack) : 'No stack available',
+    });
+    throw fetchError;
+  }
   const status = httpResponse.getResponseCode();
   const bodyText = httpResponse.getContentText();
   logVerbose_('OpenAI HTTP response received.', { status: status });
 
   if (status < 200 || status >= 300) {
+    logVerbose_('OpenAI API returned non-success status.', {
+      status: status,
+      bodyText: bodyText,
+    });
     throw new Error('OpenAI API returned status ' + status + ': ' + bodyText);
   }
 
@@ -187,15 +200,20 @@ function generateDrinkWithOpenAI_(request, context, apiKey) {
   try {
     responseObject = JSON.parse(bodyText);
   } catch (parseError) {
+    logVerbose_('Failed to parse OpenAI response JSON.', {
+      message: parseError && parseError.message ? parseError.message : 'Unknown error',
+    });
     throw new Error('Failed to parse OpenAI response JSON: ' + parseError.message);
   }
 
   if (!responseObject.choices || !responseObject.choices.length) {
+    logVerbose_('OpenAI response missing choices array.', { response: bodyText });
     throw new Error('OpenAI response missing choices array.');
   }
 
   const content = responseObject.choices[0].message && responseObject.choices[0].message.content;
   if (!content) {
+    logVerbose_('OpenAI response missing message content.', { response: bodyText });
     throw new Error('OpenAI response missing message content.');
   }
 
@@ -203,6 +221,10 @@ function generateDrinkWithOpenAI_(request, context, apiKey) {
   try {
     parsed = JSON.parse(content);
   } catch (parseContentError) {
+    logVerbose_('OpenAI message content is not valid JSON.', {
+      message: parseContentError && parseContentError.message ? parseContentError.message : 'Unknown error',
+      content: content,
+    });
     throw new Error('OpenAI message content is not valid JSON: ' + parseContentError.message);
   }
 
@@ -314,7 +336,7 @@ function registerVote(drinkId) {
   ensureSpreadsheetStructure_();
 
   if (!drinkId) {
-    throw new Error('A valid drink identifier is required to register a vote.');
+    logAndThrow_('A valid drink identifier is required to register a vote.', { drinkId: drinkId });
   }
 
   const sheet = getPrimarySheet_();
@@ -332,7 +354,7 @@ function registerVote(drinkId) {
   }
 
   if (updatedRowIndex === -1) {
-    throw new Error('The requested drink could not be located.');
+    logAndThrow_('The requested drink could not be located.', { drinkId: drinkId });
   }
 
   const newVotes = currentVotes + 1;
@@ -364,33 +386,36 @@ function registerVote(drinkId) {
  */
 function sanitizeGenerationRequest_(payload) {
   if (!payload) {
-    throw new Error('Generation payload is missing.');
+    logAndThrow_('Generation payload is missing.', { payloadProvided: false });
   }
 
   const generatorKey = String(payload.generatorKey || '').trim();
   if (!GENERATOR_LABELS[generatorKey]) {
-    throw new Error('An unsupported generator was selected.');
+    logAndThrow_('An unsupported generator was selected.', { generatorKey: generatorKey });
   }
 
   const birthMonth = Number(payload.birthMonth);
   const birthDay = Number(payload.birthDay);
   const birthYear = Number(payload.birthYear);
   if (!Number.isInteger(birthMonth) || birthMonth < 1 || birthMonth > 12) {
-    throw new Error('Birth month must be an integer between 1 and 12.');
+    logAndThrow_('Birth month must be an integer between 1 and 12.', { birthMonth: payload.birthMonth });
   }
 
   if (!Number.isInteger(birthDay) || birthDay < 1 || birthDay > 31) {
-    throw new Error('Birth day must be an integer between 1 and 31.');
+    logAndThrow_('Birth day must be an integer between 1 and 31.', { birthDay: payload.birthDay });
   }
 
   if (!Number.isInteger(birthYear) || birthYear < 1900 || birthYear > new Date().getFullYear()) {
-    throw new Error('Birth year is invalid or not provided.');
+    logAndThrow_('Birth year is invalid or not provided.', { birthYear: payload.birthYear });
   }
 
   const firstName = String(payload.firstName || '').trim();
   const lastName = String(payload.lastName || '').trim();
   if (!firstName || !lastName) {
-    throw new Error('First name and last name are required for drink generation.');
+    logAndThrow_('First name and last name are required for drink generation.', {
+      firstNameProvided: Boolean(firstName),
+      lastNameProvided: Boolean(lastName),
+    });
   }
 
   return {
@@ -512,7 +537,7 @@ function getGeneratorByKey_(key) {
     case 'dynasty':
       return generateDynasticDrinkDynasty_;
     default:
-      throw new Error('Unsupported generator key: ' + key);
+      logAndThrow_('Unsupported generator key encountered during lookup.', { generatorKey: key });
   }
 }
 
@@ -823,7 +848,7 @@ function ensureSpreadsheetStructure_() {
 function getPrimarySheet_() {
   const sheet = getOrCreateStorageSpreadsheet_().getSheetByName(SHEET_CONFIGURATION.primaryName);
   if (!sheet) {
-    throw new Error('Primary sheet is missing.');
+    logAndThrow_('Primary sheet is missing.', { sheetName: SHEET_CONFIGURATION.primaryName });
   }
   return sheet;
 }
@@ -836,7 +861,7 @@ function getPrimarySheet_() {
 function getVotesSheet_() {
   const sheet = getOrCreateStorageSpreadsheet_().getSheetByName(SHEET_CONFIGURATION.votesName);
   if (!sheet) {
-    throw new Error('Vote audit sheet is missing.');
+    logAndThrow_('Vote audit sheet is missing.', { sheetName: SHEET_CONFIGURATION.votesName });
   }
   return sheet;
 }
@@ -857,6 +882,7 @@ function getOrCreateStorageSpreadsheet_() {
     return activeSpreadsheet;
   }
 
+  logVerbose_('No active spreadsheet detected; attempting to rehydrate from script properties.');
   const scriptProperties = PropertiesService.getScriptProperties();
   const storedId = scriptProperties.getProperty(STORAGE_SPREADSHEET_ID_PROPERTY);
   if (storedId) {
@@ -883,6 +909,7 @@ function getOrCreateStorageSpreadsheet_() {
  */
 function persistStorageSpreadsheetId_(spreadsheetId) {
   PropertiesService.getScriptProperties().setProperty(STORAGE_SPREADSHEET_ID_PROPERTY, spreadsheetId);
+  logVerbose_('Storage spreadsheet identifier persisted to script properties.', { id: spreadsheetId });
 }
 
 /**
@@ -1117,4 +1144,20 @@ function logVerbose_(message, data) {
       Logger.log('[MythicMixology] %s :: [unserializable data]', message);
     }
   }
+}
+
+/**
+ * Logs a verbose message and throws a standardized error for consistent diagnostics.
+ * @param {string} message Human-readable error description.
+ * @param {*} data Optional diagnostic payload to include in the verbose log.
+ * @throws {Error}
+ * @private
+ */
+function logAndThrow_(message, data) {
+  if (data === undefined) {
+    logVerbose_(message);
+  } else {
+    logVerbose_(message, data);
+  }
+  throw new Error(message);
 }
