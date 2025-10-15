@@ -653,6 +653,75 @@
         const userSignature = document.getElementById('userSignature');
 
         /**
+         * Provides a compact summary of values for diagnostic logging without
+         * overwhelming international consoles.
+         * @param {*} value Value to summarize.
+         * @return {{type: string, keys?: string[], length?: number, sample?: string}}
+         */
+        function summarizeForLog(value) {
+          if (value === null || value === undefined) {
+            return { type: String(value) };
+          }
+
+          if (Array.isArray(value)) {
+            return { type: 'array', length: value.length };
+          }
+
+          const valueType = typeof value;
+          if (valueType === 'object') {
+            try {
+              return { type: 'object', keys: Object.keys(value) };
+            } catch (error) {
+              return { type: 'object', keys: ['<unavailable>'] };
+            }
+          }
+
+          const sample = String(value);
+          return {
+            type: valueType,
+            sample: sample.length > 120 ? sample.slice(0, 120) + '…' : sample,
+          };
+        }
+
+        /**
+         * Normalizes diverse Apps Script error shapes into a consistent object.
+         * @param {*} error Raw error payload from failure handler.
+         * @return {{message: string, detail: (string|null)}}
+         */
+        function normalizeServerError(error) {
+          if (!error) {
+            return { message: 'An unknown error occurred.', detail: null };
+          }
+
+          if (typeof error === 'string') {
+            return { message: error, detail: null };
+          }
+
+          let message = 'An unexpected error was returned by the server.';
+          if (typeof error.message === 'string' && error.message.trim()) {
+            message = error.message.trim();
+          } else if (typeof error.toString === 'function') {
+            const converted = String(error.toString());
+            if (converted && converted !== '[object Object]') {
+              message = converted;
+            }
+          }
+
+          let detail = null;
+          if (error.stack) {
+            detail = String(error.stack);
+          } else if (error.details) {
+            try {
+              detail = typeof error.details === 'string' ? error.details : JSON.stringify(error.details);
+            } catch (serializationError) {
+              detail = 'Unable to serialize additional error details.';
+            }
+          }
+
+          return { message: message, detail: detail };
+        }
+
+        /**
          * Populates month select options in an internationally friendly manner.
          */
         function populateMonths() {
@@ -690,15 +759,44 @@
           if (!scriptRunner) {
             console.warn('[invokeServer] Apps Script runner unavailable; offline preview mode.');
             if (typeof onFailure === 'function') {
-              onFailure(new Error('Apps Script interface unavailable in preview mode.'));
+              onFailure(normalizeServerError(new Error('Apps Script interface unavailable in preview mode.')), null);
             }
             return;
           }
 
-          var runner = scriptRunner.withSuccessHandler(onSuccess || function () {});
-          if (typeof onFailure === 'function') {
-            runner = runner.withFailureHandler(onFailure);
-          }
+          console.info('[invokeServer] Dispatching method.', {
+            methodName: methodName,
+            payloadSummary: summarizeForLog(payload),
+          });
+
+          var startTime = Date.now();
+          var runner = scriptRunner.withSuccessHandler(function (result) {
+            var durationMs = Date.now() - startTime;
+            console.info('[invokeServer] Method succeeded.', {
+              methodName: methodName,
+              durationMs: durationMs,
+              resultSummary: summarizeForLog(result),
+            });
+            if (typeof onSuccess === 'function') {
+              onSuccess(result);
+            }
+          });
+
+          runner = runner.withFailureHandler(function (error) {
+            var durationMs = Date.now() - startTime;
+            var normalized = normalizeServerError(error);
+            console.error('[invokeServer] Method failed.', {
+              methodName: methodName,
+              durationMs: durationMs,
+              message: normalized.message,
+            });
+            if (normalized.detail) {
+              console.debug('[invokeServer] Failure detail trace.', normalized.detail);
+            }
+            if (typeof onFailure === 'function') {
+              onFailure(normalized, error);
+            }
+          });
 
           if (payload === undefined) {
             runner[methodName]();
@@ -847,6 +945,7 @@
           }
 
           generateButton.disabled = true;
+          console.info('[handleGenerate] Validated form data ready for submission.', data);
           showToast('Contacting celestial servers...');
 
           invokeServer(
@@ -860,10 +959,13 @@
               renderTable();
               showToast('Drink generated and stored successfully.');
             },
-            function (error) {
-              console.error('[generateDrink failure]', error);
+            function (normalizedError) {
+              console.error('[generateDrink failure]', normalizedError);
+              if (normalizedError.detail) {
+                console.debug('[generateDrink failure detail]', normalizedError.detail);
+              }
               generateButton.disabled = false;
-              showToast('Generation failed: ' + error.message);
+              showToast('Generation failed: ' + normalizedError.message);
             }
           );
         }
@@ -908,9 +1010,12 @@
               renderTable();
               showToast('Archive synchronized.');
             },
-            function (error) {
-              console.error('[getStoredDrinks failure]', error);
-              showToast('Unable to retrieve drinks: ' + error.message);
+            function (normalizedError) {
+              console.error('[getStoredDrinks failure]', normalizedError);
+              if (normalizedError.detail) {
+                console.debug('[getStoredDrinks failure detail]', normalizedError.detail);
+              }
+              showToast('Unable to retrieve drinks: ' + normalizedError.message);
             }
           );
         }
@@ -1039,10 +1144,13 @@
               }
               showToast('Vote tallied for ' + drink.drinkName + '.');
             },
-            function (error) {
-              console.error('[registerVote failure]', error);
+            function (normalizedError) {
+              console.error('[registerVote failure]', normalizedError);
+              if (normalizedError.detail) {
+                console.debug('[registerVote failure detail]', normalizedError.detail);
+              }
               button.disabled = false;
-              showToast('Unable to register vote: ' + error.message);
+              showToast('Unable to register vote: ' + normalizedError.message);
             }
           );
         }
