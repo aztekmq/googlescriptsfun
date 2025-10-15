@@ -36,6 +36,12 @@ const SHEET_CONFIGURATION = Object.freeze({
 });
 
 /**
+ * Script property key used to remember the storage spreadsheet identifier.
+ * @type {string}
+ */
+const STORAGE_SPREADSHEET_ID_PROPERTY = 'mythicMixology.storageSpreadsheetId';
+
+/**
  * Internationalized lookup between generator identifiers and descriptive names.
  * @type {{[key: string]: string}}
  */
@@ -622,10 +628,7 @@ function generateDynasticDrinkDynasty_(context) {
  * @private
  */
 function ensureSpreadsheetStructure_() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  if (!spreadsheet) {
-    throw new Error('An active spreadsheet is required for storage.');
-  }
+  const spreadsheet = getOrCreateStorageSpreadsheet_();
 
   let primarySheet = spreadsheet.getSheetByName(SHEET_CONFIGURATION.primaryName);
   if (!primarySheet) {
@@ -652,7 +655,7 @@ function ensureSpreadsheetStructure_() {
  * @private
  */
 function getPrimarySheet_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIGURATION.primaryName);
+  const sheet = getOrCreateStorageSpreadsheet_().getSheetByName(SHEET_CONFIGURATION.primaryName);
   if (!sheet) {
     throw new Error('Primary sheet is missing.');
   }
@@ -665,11 +668,55 @@ function getPrimarySheet_() {
  * @private
  */
 function getVotesSheet_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIGURATION.votesName);
+  const sheet = getOrCreateStorageSpreadsheet_().getSheetByName(SHEET_CONFIGURATION.votesName);
   if (!sheet) {
     throw new Error('Vote audit sheet is missing.');
   }
   return sheet;
+}
+
+/**
+ * Retrieves the storage spreadsheet, creating or rehydrating it as required.
+ * This helper first attempts to use the active spreadsheet, then falls back to
+ * a previously stored identifier, and finally creates a dedicated spreadsheet
+ * when none is available.
+ * @return {GoogleAppsScript.Spreadsheet.Spreadsheet}
+ * @private
+ */
+function getOrCreateStorageSpreadsheet_() {
+  const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (activeSpreadsheet) {
+    logVerbose_('Active spreadsheet detected; using as storage backbone.', { id: activeSpreadsheet.getId() });
+    persistStorageSpreadsheetId_(activeSpreadsheet.getId());
+    return activeSpreadsheet;
+  }
+
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const storedId = scriptProperties.getProperty(STORAGE_SPREADSHEET_ID_PROPERTY);
+  if (storedId) {
+    try {
+      const storedSpreadsheet = SpreadsheetApp.openById(storedId);
+      logVerbose_('Rehydrated storage spreadsheet from script properties.', { id: storedId });
+      return storedSpreadsheet;
+    } catch (error) {
+      logVerbose_('Failed to open stored spreadsheet identifier; creating new storage.', { id: storedId, error: String(error) });
+    }
+  }
+
+  const createdSpreadsheet = SpreadsheetApp.create(APPLICATION_TITLE + ' Storage');
+  logVerbose_('Created dedicated storage spreadsheet.', { id: createdSpreadsheet.getId(), url: createdSpreadsheet.getUrl() });
+  persistStorageSpreadsheetId_(createdSpreadsheet.getId());
+  return createdSpreadsheet;
+}
+
+/**
+ * Persists the provided spreadsheet identifier to script properties for future
+ * executions.
+ * @param {string} spreadsheetId Identifier to persist.
+ * @private
+ */
+function persistStorageSpreadsheetId_(spreadsheetId) {
+  PropertiesService.getScriptProperties().setProperty(STORAGE_SPREADSHEET_ID_PROPERTY, spreadsheetId);
 }
 
 /**
