@@ -1,7 +1,7 @@
 # Cocktail Picker Deployment and Configuration Guide
 
 ## Summary
-This document provides prescriptive guidance for deploying, configuring, and maintaining the Cocktail Picker Google Apps Script solution. The instructions target novice IT professionals and are written in the style of Microsoft technical documentation: procedural, comprehensive, and explicit about prerequisites and validation steps. After completing this guide you will have a fully functioning solution that can provide cocktail recommendations via the OpenAI Chat Completions API while emitting verbose logs for troubleshooting.
+This document provides prescriptive guidance for deploying, configuring, and maintaining the Cocktail Picker Google Apps Script solution. The instructions target novice IT professionals and are written in the style of Industry Standard's technical documentation: procedural, comprehensive, and explicit about prerequisites and validation steps. After completing this guide you will have a fully functioning solution that can provide cocktail recommendations via the OpenAI Chat Completions API while emitting verbose logs for troubleshooting.
 
 ## Audience profile
 - **Primary role:** Novice to intermediate IT administrators or support engineers responsible for Google Workspace automation.
