@@ -1,0 +1,10 @@
+{
+  "timeZone": "Etc/UTC",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "webapp": {
+    "access": "ANYONE_WITH_GOOGLE_ACCOUNT",
+    "executeAs": "USER_DEPLOYING"
+  }
+}

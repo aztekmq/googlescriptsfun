@@ -38,7 +38,21 @@ Follow the steps in sequence. Each step builds on the preceding one.
 2. Create a new script file named `Code.gs` and paste the server-side content from this repository's `cockTailPicker/Code.gs` file.
 3. Select **File → New → HTML file**, name it `Index`, and paste the contents from `cockTailPicker/Index.html`.
 4. Press **Ctrl+S** (Windows) or **Cmd+S** (macOS) to save all files.
-5. Return to the Google Sheet and refresh the page. Confirm that the spreadsheet now contains tabs named `GeneratedDrinks` and `VoteAudit`. If the tabs are missing, run the `ensureSpreadsheetStructure_` function from the Apps Script editor to initialize the storage before deploying the web app.
+5. In the left navigation, select **Project Settings → Show "appsscript.json" manifest file in editor**. Open the newly visible `appsscript.json` file and replace its contents with:
+   ```json
+   {
+     "timeZone": "Etc/UTC",
+     "dependencies": {},
+     "exceptionLogging": "STACKDRIVER",
+     "runtimeVersion": "V8",
+     "webapp": {
+       "access": "ANYONE_WITH_GOOGLE_ACCOUNT",
+       "executeAs": "USER_DEPLOYING"
+     }
+   }
+   ```
+   This configuration aligns with Google Apps Script manifest requirements and avoids progressive web app fields such as `theme_color` or `icons` that trigger validation failures.
+6. Return to the Google Sheet and refresh the page. Confirm that the spreadsheet now contains tabs named `GeneratedDrinks` and `VoteAudit`. If the tabs are missing, run the `ensureSpreadsheetStructure_` function from the Apps Script editor to initialize the storage before deploying the web app.
 
 > [!TIP]
 > When pasting the files, confirm that the header comments (`@fileoverview`) remain intact. These comments provide standardized documentation recognized across international teams.
