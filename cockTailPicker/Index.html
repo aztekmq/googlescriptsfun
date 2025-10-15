@@ -7,7 +7,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0071e3" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="manifest.json" id="pwaManifestLink" />
+    <link rel="apple-touch-icon" id="appleTouchIconLink" />
+    <script src="assets/icon-assets.js"></script>
     <title>Mythic Mixology Lab</title>
     <style>
       :root {
@@ -33,6 +40,7 @@
       body {
         margin: 0;
         min-height: 100vh;
+        min-height: 100dvh;
         background: var(--bg-gradient);
         color: var(--text-primary);
         display: flex;
@@ -40,6 +48,7 @@
         justify-content: center;
         padding: clamp(16px, 4vw, 56px);
         position: relative;
+        -webkit-tap-highlight-color: transparent;
       }
 
       h1,
@@ -95,6 +104,7 @@
         display: none;
         position: relative;
         backdrop-filter: blur(12px);
+        margin: 0 auto;
       }
 
       .app-shell.active {
@@ -265,6 +275,7 @@
         box-shadow: 0 18px 36px rgba(0, 0, 0, 0.15);
         display: none;
         min-width: 280px;
+        z-index: 50;
       }
 
       .toast.active {
@@ -288,6 +299,16 @@
         background: rgba(255, 255, 255, 0.78);
         border-radius: 16px;
         overflow: hidden;
+      }
+
+      .table-container {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .table-container table {
+        min-width: 640px;
       }
 
       thead {
@@ -425,6 +446,52 @@
         font-size: 0.9rem;
       }
 
+      .install-banner {
+        position: fixed;
+        inset-inline: 16px;
+        bottom: 16px;
+        padding: 18px 20px;
+        background: rgba(255, 255, 255, 0.94);
+        border-radius: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 22px 40px rgba(0, 0, 0, 0.18);
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 60;
+      }
+
+      .install-banner[hidden] {
+        display: none;
+      }
+
+      .install-banner__text {
+        flex: 1;
+      }
+
+      .install-banner__title {
+        margin: 0 0 6px;
+        font-size: 1.05rem;
+      }
+
+      .install-banner__actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .install-banner--ios {
+        flex-direction: column;
+        text-align: left;
+      }
+
+      .install-banner--ios .install-banner__actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
       @media (max-width: 720px) {
         body {
           padding: clamp(16px, 6vw, 36px);
@@ -450,10 +517,47 @@
           flex-direction: column;
         }
 
-        table {
-          display: block;
-          overflow-x: auto;
-          white-space: nowrap;
+        .toast {
+          left: 16px;
+          right: 16px;
+          bottom: 16px;
+          min-width: auto;
+        }
+
+        .table-container table {
+          min-width: 100%;
+        }
+
+        .install-banner {
+          flex-direction: column;
+          gap: 12px;
+          align-items: flex-start;
+        }
+
+        .install-banner__actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: clamp(1.8rem, 6vw, 2.4rem);
+        }
+
+        h2 {
+          font-size: clamp(1.3rem, 5vw, 1.8rem);
+        }
+
+        button,
+        .button-link {
+          width: 100%;
+          justify-content: center;
+        }
+
+        .home-button {
+          width: 100%;
+          justify-content: center;
         }
       }
     </style>
@@ -596,6 +700,36 @@
 
     <div class="toast" id="toast" role="status"></div>
 
+    <aside class="install-banner" id="installBanner" hidden role="region" aria-live="polite">
+      <div class="install-banner__text">
+        <h3 class="install-banner__title">Install Mythic Mixology Lab</h3>
+        <p>Save this experience to your home screen for a native-feeling adventure.</p>
+      </div>
+      <div class="install-banner__actions">
+        <button type="button" class="ghost-button" id="installDismissButton">Maybe later</button>
+        <button type="button" id="installButton">Install App</button>
+      </div>
+    </aside>
+
+    <aside
+      class="install-banner install-banner--ios"
+      id="iosInstallBanner"
+      hidden
+      role="region"
+      aria-live="polite"
+    >
+      <div class="install-banner__text">
+        <h3 class="install-banner__title">Add Mythic Mixology Lab</h3>
+        <p>
+          Tap the share icon in Safari and choose <strong>Add to Home Screen</strong> to enjoy the full-screen
+          experience.
+        </p>
+      </div>
+      <div class="install-banner__actions">
+        <button type="button" class="ghost-button" id="iosDismissButton">Understood</button>
+      </div>
+    </aside>
+
     <script>
       /**
        * @fileoverview Client-side controller for view management, validation,
@@ -651,6 +785,45 @@
         const closeDetailButton = document.getElementById('closeDetailButton');
         const toast = document.getElementById('toast');
         const userSignature = document.getElementById('userSignature');
+        const installBanner = document.getElementById('installBanner');
+        const installButton = document.getElementById('installButton');
+        const installDismissButton = document.getElementById('installDismissButton');
+        const iosInstallBanner = document.getElementById('iosInstallBanner');
+        const iosDismissButton = document.getElementById('iosDismissButton');
+        const manifestLink = document.getElementById('pwaManifestLink');
+        const appleTouchIconLink = document.getElementById('appleTouchIconLink');
+
+        /**
+         * Base manifest definition leveraged to generate a Blob-backed manifest
+         * that incorporates the dynamically embedded icon payloads.
+         * @type {!Object<string, *>}
+         */
+        const manifestDefinition = {
+          name: 'Mythic Mixology Lab',
+          short_name: 'Mixology',
+          description: 'Craft cosmic cocktails with a native-feeling progressive web experience.',
+          start_url: './',
+          display: 'standalone',
+          background_color: '#f5f5f7',
+          theme_color: '#0071e3',
+          lang: 'en',
+          dir: 'ltr',
+        };
+
+        let generatedManifestUrl = '';
+        if (window.AppIconAssets && typeof window.AppIconAssets.ensureManifest === 'function') {
+          generatedManifestUrl = window.AppIconAssets.ensureManifest(manifestLink, manifestDefinition);
+          window.AppIconAssets.applyIconToLink(appleTouchIconLink, 192);
+        } else {
+          console.warn('[PWA] Icon asset module unavailable; fallback manifest in use.');
+        }
+
+        window.addEventListener('unload', function () {
+          if (generatedManifestUrl) {
+            URL.revokeObjectURL(generatedManifestUrl);
+            console.info('[PWA] Released generated manifest URL during unload.');
+          }
+        });
 
         /**
          * Provides a compact summary of values for diagnostic logging without
@@ -816,6 +989,132 @@
           setTimeout(function () {
             toast.classList.remove('active');
           }, 3800);
+        }
+
+        /**
+         * Determines whether the experience is already operating in standalone mode.
+         * @return {boolean} True when the browser reports a standalone display context.
+         */
+        function isStandaloneMode() {
+          return (
+            window.matchMedia('(display-mode: standalone)').matches === true ||
+            window.navigator.standalone === true
+          );
+        }
+
+        /**
+         * Performs a lightweight detection for iOS devices.
+         * @return {boolean} True when the user agent represents an iOS device.
+         */
+        function isIosDevice() {
+          return /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+        }
+
+        /**
+         * Registers the progressive web app service worker to enable installation and caching.
+         */
+        function registerServiceWorker() {
+          if (!('serviceWorker' in navigator)) {
+            console.info('[PWA] Service workers are not supported in this browser.');
+            return;
+          }
+
+          window.addEventListener('load', function () {
+            navigator.serviceWorker
+              .register('service-worker.js')
+              .then(function (registration) {
+                console.info('[PWA] Service worker registered.', { scope: registration.scope });
+              })
+              .catch(function (error) {
+                console.error('[PWA] Service worker registration failed.', {
+                  message: error && error.message ? error.message : 'Unknown error',
+                });
+              });
+          });
+        }
+
+        /**
+         * Configures install prompts for Android/desktop browsers and iOS guidance.
+         */
+        function initializeInstallPrompts() {
+          if (
+            !installBanner ||
+            !installButton ||
+            !installDismissButton ||
+            !iosInstallBanner ||
+            !iosDismissButton
+          ) {
+            console.warn('[PWA] Install controls are unavailable in the DOM.');
+            return;
+          }
+
+          var smartDeviceRegex = /android|iphone|ipad|ipod|mobile/i;
+          if (!smartDeviceRegex.test(window.navigator.userAgent || '')) {
+            console.info('[PWA] Install prompts are presented only on smart devices.');
+            return;
+          }
+
+          if (isStandaloneMode()) {
+            console.info('[PWA] Experience already running in standalone mode.');
+            return;
+          }
+
+          var deferredPrompt = null;
+
+          if (isIosDevice()) {
+            console.info('[PWA] Displaying iOS installation guidance.');
+            iosInstallBanner.hidden = false;
+            iosDismissButton.addEventListener('click', function () {
+              iosInstallBanner.hidden = true;
+              console.info('[PWA] iOS guidance dismissed.');
+            });
+          }
+
+          window.addEventListener('beforeinstallprompt', function (event) {
+            console.info('[PWA] beforeinstallprompt intercepted.', { platforms: event.platforms });
+            event.preventDefault();
+            deferredPrompt = event;
+            installBanner.hidden = false;
+          });
+
+          installButton.addEventListener('click', function () {
+            console.info('[PWA] Install button clicked.');
+            if (!deferredPrompt) {
+              console.warn('[PWA] No deferred prompt available for installation.');
+              showToast('Install prompt not available. Use your browser menu to install.');
+              return;
+            }
+
+            installBanner.hidden = true;
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice
+              .then(function (choice) {
+                console.info('[PWA] Install choice recorded.', choice);
+                if (!choice || choice.outcome !== 'accepted') {
+                  showToast('Install cancelled. You can add it later from your browser menu.');
+                }
+              })
+              .catch(function (error) {
+                console.error('[PWA] Install prompt failed to resolve.', {
+                  message: error && error.message ? error.message : 'Unknown error',
+                });
+              })
+              .finally(function () {
+                deferredPrompt = null;
+              });
+          });
+
+          installDismissButton.addEventListener('click', function () {
+            installBanner.hidden = true;
+            console.info('[PWA] Install banner dismissed by the visitor.');
+          });
+
+          window.addEventListener('appinstalled', function () {
+            console.info('[PWA] Application successfully installed.');
+            installBanner.hidden = true;
+            iosInstallBanner.hidden = true;
+            showToast('Mythic Mixology Lab installed on your device.');
+          });
         }
 
         /**
@@ -1200,6 +1499,8 @@
           });
         });
 
+        registerServiceWorker();
+        initializeInstallPrompts();
         populateMonths();
       })();
     </script>
