@@ -90,6 +90,7 @@ The solution reads the OpenAI API key from a script property named `OPENAI_API_K
 
 ### Monitoring and verbose logging
 - **Server-side logging:** The helper function `logVerbose_` automatically structures log entries. No additional configuration is required to enable verbose output.
+- **Server-side error diagnostics:** The `logAndThrow_` helper logs contextual metadata before surfacing runtime exceptions, ensuring that every failure path is traceable in the execution logs.
 - **Client-side logging:** Browser console statements (`console.debug`, `console.info`, and `console.error`) are provided for step-by-step visibility.
 - **Retention:** Apps Script retains execution logs for 30 days. Export logs periodically if you require longer retention for compliance.
 
