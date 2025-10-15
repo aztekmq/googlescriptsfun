@@ -76,42 +76,54 @@ function doGet() {
  */
 function generateDrink(payload) {
   logVerbose_('generateDrink invoked with raw payload.', payload);
-  ensureSpreadsheetStructure_();
+  let request;
 
-  const request = sanitizeGenerationRequest_(payload);
-  logVerbose_('Generation payload sanitized.', request);
+  try {
+    ensureSpreadsheetStructure_();
 
-  const context = buildGenerationContext_(request);
-  logVerbose_('Constructed deterministic context for generator.', context);
+    request = sanitizeGenerationRequest_(payload);
+    logVerbose_('Generation payload sanitized.', request);
 
-  const generator = getGeneratorByKey_(request.generatorKey);
-  logVerbose_('Resolved generator function for key.', request.generatorKey);
+    const context = buildGenerationContext_(request);
+    logVerbose_('Constructed deterministic context for generator.', context);
 
-  let blueprint = null;
-  const openAiKey = getOpenAiApiKey_();
-  if (openAiKey) {
-    try {
-      blueprint = generateDrinkWithOpenAI_(request, context, openAiKey);
-      logVerbose_('OpenAI blueprint generation succeeded.', blueprint);
-    } catch (error) {
-      logVerbose_('OpenAI blueprint generation failed; reverting to deterministic generator.', {
-        message: error && error.message ? error.message : 'Unknown error',
-        stack: error && error.stack ? String(error.stack) : 'No stack available',
-      });
+    const generator = getGeneratorByKey_(request.generatorKey);
+    logVerbose_('Resolved generator function for key.', request.generatorKey);
+
+    let blueprint = null;
+    const openAiKey = getOpenAiApiKey_();
+    if (openAiKey) {
+      try {
+        blueprint = generateDrinkWithOpenAI_(request, context, openAiKey);
+        logVerbose_('OpenAI blueprint generation succeeded.', blueprint);
+      } catch (error) {
+        logVerbose_('OpenAI blueprint generation failed; reverting to deterministic generator.', {
+          message: error && error.message ? error.message : 'Unknown error',
+          stack: error && error.stack ? String(error.stack) : 'No stack available',
+        });
+      }
+    } else {
+      logVerbose_('OpenAI API key not detected; using deterministic generator.');
     }
-  } else {
-    logVerbose_('OpenAI API key not detected; using deterministic generator.');
+
+    if (!blueprint) {
+      blueprint = generator(context);
+      logVerbose_('Deterministic generator produced blueprint.', blueprint);
+    }
+
+    const persisted = persistBlueprint_(request, blueprint);
+    logVerbose_('Blueprint persisted to spreadsheet.', persisted);
+
+    return persisted;
+  } catch (error) {
+    logVerbose_('generateDrink encountered an unrecoverable error.', {
+      message: error && error.message ? error.message : 'Unknown error',
+      stack: error && error.stack ? String(error.stack) : 'No stack available',
+      generatorKey: request && request.generatorKey ? request.generatorKey : 'unresolved',
+      payload: payload,
+    });
+    throw error;
   }
-
-  if (!blueprint) {
-    blueprint = generator(context);
-    logVerbose_('Deterministic generator produced blueprint.', blueprint);
-  }
-
-  const persisted = persistBlueprint_(request, blueprint);
-  logVerbose_('Blueprint persisted to spreadsheet.', persisted);
-
-  return persisted;
 }
 
 /**
@@ -178,6 +190,10 @@ function generateDrinkWithOpenAI_(request, context, apiKey) {
   const status = httpResponse.getResponseCode();
   const bodyText = httpResponse.getContentText();
   logVerbose_('OpenAI HTTP response received.', { status: status });
+  if (bodyText) {
+    const preview = bodyText.length > 500 ? bodyText.slice(0, 500) + '…' : bodyText;
+    logVerbose_('OpenAI HTTP response body preview captured for diagnostics.', { preview: preview });
+  }
 
   if (status < 200 || status >= 300) {
     throw new Error('OpenAI API returned status ' + status + ': ' + bodyText);
