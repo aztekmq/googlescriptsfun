@@ -11,16 +11,19 @@
     <title>Mythic Mixology Lab</title>
     <style>
       :root {
-        color-scheme: dark;
+        color-scheme: light;
         font-family: 'Poppins', 'Segoe UI', Roboto, sans-serif;
-        --bg-gradient: linear-gradient(135deg, #140f2d, #2f2354 45%, #512d6d);
-        --accent-gradient: linear-gradient(135deg, #ff8a5c, #fd3a69);
-        --card-bg: rgba(24, 22, 48, 0.85);
-        --card-border: rgba(255, 255, 255, 0.12);
-        --text-primary: #f5f6ff;
-        --text-muted: rgba(245, 246, 255, 0.68);
-        --danger: #ff6b6b;
-        --success: #5cfdb2;
+        --bg-gradient: linear-gradient(135deg, #f5f5f7, #d2d2d7 45%, #e5e5ea);
+        --accent-gradient: linear-gradient(135deg, #0a84ff, #0071e3);
+        --accent-solid: #0071e3;
+        --card-bg: rgba(255, 255, 255, 0.9);
+        --card-border: rgba(0, 0, 0, 0.08);
+        --text-primary: #1d1d1f;
+        --text-muted: rgba(29, 29, 31, 0.6);
+        --danger: #ff3b30;
+        --success: #34c759;
+        --surface-elevated: rgba(255, 255, 255, 0.85);
+        --shadow-soft: 0 24px 48px rgba(41, 41, 43, 0.18);
       }
 
       * {
@@ -35,7 +38,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: clamp(16px, 3vw, 48px);
+        padding: clamp(16px, 4vw, 56px);
         position: relative;
       }
 
@@ -58,7 +61,7 @@
         padding: 14px 24px;
         border-radius: 999px;
         background: var(--accent-gradient);
-        color: #1f0f2d;
+        color: #ffffff;
         font-weight: 600;
         letter-spacing: 0.02em;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -66,12 +69,13 @@
         align-items: center;
         gap: 10px;
         text-decoration: none;
+        box-shadow: 0 12px 24px rgba(0, 113, 227, 0.22);
       }
 
       button:hover,
       .button-link:hover {
         transform: translateY(-2px);
-        box-shadow: 0 18px 36px rgba(253, 58, 105, 0.35);
+        box-shadow: 0 16px 32px rgba(0, 113, 227, 0.28);
       }
 
       button:disabled {
@@ -85,11 +89,12 @@
         width: min(1080px, 100%);
         background: var(--card-bg);
         border: 1px solid var(--card-border);
-        border-radius: 24px;
+        border-radius: 28px;
         padding: clamp(24px, 3vw, 40px);
-        box-shadow: 0 30px 60px rgba(10, 6, 29, 0.55);
+        box-shadow: var(--shadow-soft);
         display: none;
         position: relative;
+        backdrop-filter: blur(12px);
       }
 
       .app-shell.active {
@@ -100,15 +105,16 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 24px;
+        margin-bottom: clamp(16px, 3vw, 28px);
+        gap: 16px;
       }
 
       .home-button {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.65);
         color: var(--text-primary);
         border-radius: 999px;
         padding: 10px 18px;
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(0, 0, 0, 0.08);
         backdrop-filter: blur(12px);
         display: inline-flex;
         align-items: center;
@@ -118,7 +124,7 @@
       }
 
       .home-button:hover {
-        background: rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.85);
       }
 
       .view {
@@ -142,12 +148,12 @@
       }
 
       .hero-card {
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 20px;
+        background: var(--surface-elevated);
+        border-radius: 24px;
         padding: clamp(28px, 4vw, 42px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid var(--card-border);
         text-align: center;
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+        box-shadow: 0 20px 38px rgba(41, 41, 43, 0.12);
       }
 
       .hero-actions {
@@ -167,6 +173,7 @@
         display: block;
         margin-bottom: 8px;
         font-weight: 500;
+        color: var(--text-primary);
       }
 
       select,
@@ -175,8 +182,8 @@
         width: 100%;
         padding: 12px 14px;
         border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(15, 12, 35, 0.65);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.9);
         color: var(--text-primary);
         font-size: 0.97rem;
         transition: border 0.2s ease, box-shadow 0.2s ease;
@@ -186,8 +193,8 @@
       input:focus,
       textarea:focus {
         outline: none;
-        border-color: rgba(253, 58, 105, 0.7);
-        box-shadow: 0 0 0 2px rgba(253, 58, 105, 0.2);
+        border-color: rgba(10, 132, 255, 0.85);
+        box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
       }
 
       .field-invalid {
@@ -210,8 +217,8 @@
         margin-top: 28px;
         padding: 24px;
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(0, 0, 0, 0.05);
         display: none;
       }
 
@@ -244,7 +251,7 @@
       ul.styled-list li::before {
         content: '\2022';
         margin-right: 10px;
-        color: #fd3a69;
+        color: var(--accent-solid);
       }
 
       .toast {
@@ -252,10 +259,10 @@
         bottom: 24px;
         right: 24px;
         padding: 16px 20px;
-        background: rgba(15, 12, 35, 0.92);
+        background: rgba(255, 255, 255, 0.95);
         border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.15);
         display: none;
         min-width: 280px;
       }
@@ -278,13 +285,13 @@
       table {
         width: 100%;
         border-collapse: collapse;
-        background: rgba(12, 10, 26, 0.7);
+        background: rgba(255, 255, 255, 0.78);
         border-radius: 16px;
         overflow: hidden;
       }
 
       thead {
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(242, 242, 247, 0.75);
       }
 
       th,
@@ -315,16 +322,16 @@
       }
 
       .ghost-button {
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--text-primary);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(10, 132, 255, 0.1);
+        color: var(--accent-solid);
+        border: 1px solid rgba(10, 132, 255, 0.25);
         padding: 10px 16px;
       }
 
       .detail-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(10, 8, 24, 0.85);
+        background: rgba(245, 245, 247, 0.92);
         display: none;
         align-items: center;
         justify-content: center;
@@ -338,31 +345,31 @@
 
       .detail-card {
         width: min(520px, 100%);
-        background: rgba(19, 17, 44, 0.95);
-        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.96);
+        border-radius: 24px;
         padding: 28px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(0, 0, 0, 0.08);
       }
 
       .age-gate {
         position: fixed;
         inset: 0;
-        background: rgba(10, 6, 20, 0.94);
+        background: rgba(245, 245, 247, 0.92);
         display: flex;
         align-items: center;
         justify-content: center;
         z-index: 30;
-        padding: 24px;
+        padding: clamp(24px, 6vw, 48px);
       }
 
       .age-card {
-        background: rgba(25, 21, 48, 0.92);
-        padding: 32px;
-        border-radius: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        width: min(420px, 100%);
+        background: rgba(255, 255, 255, 0.96);
+        padding: clamp(28px, 5vw, 40px);
+        border-radius: 28px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        width: min(460px, 100%);
         text-align: center;
-        box-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
+        box-shadow: 0 26px 60px rgba(41, 41, 43, 0.16);
       }
 
       .age-card h2 {
@@ -371,6 +378,8 @@
 
       .age-card form {
         margin-top: 24px;
+        display: grid;
+        gap: 18px;
       }
 
       .age-error {
@@ -383,9 +392,69 @@
         display: block;
       }
 
+      .choice-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .choice-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-radius: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.92);
+        transition: border 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .choice-option input[type='radio'] {
+        width: 20px;
+        height: 20px;
+        accent-color: var(--accent-solid);
+      }
+
+      .choice-option:hover {
+        border-color: rgba(10, 132, 255, 0.6);
+        box-shadow: 0 10px 24px rgba(10, 132, 255, 0.12);
+      }
+
       .status-text {
         color: var(--text-muted);
         font-size: 0.9rem;
+      }
+
+      @media (max-width: 720px) {
+        body {
+          padding: clamp(16px, 6vw, 36px);
+        }
+
+        .top-nav {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .hero-actions {
+          flex-direction: column;
+          width: 100%;
+        }
+
+        .hero-actions button,
+        .hero-actions .ghost-button {
+          width: 100%;
+          justify-content: center;
+        }
+
+        .search-controls {
+          flex-direction: column;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
       }
     </style>
   </head>
@@ -393,12 +462,23 @@
     <section class="age-gate" id="ageGate" role="dialog" aria-modal="true">
       <div class="age-card">
         <h2>Age Verification</h2>
-        <p>Please confirm your date of birth. You must be 21 years or older to enter the Mythic Mixology Lab.</p>
+        <p>Please confirm that you are 21 years of age or older to enter the Mythic Mixology Lab.</p>
         <form id="ageForm" autocomplete="off">
-          <label for="birthDate">Birthdate</label>
-          <input id="birthDate" name="birthDate" type="date" required aria-required="true" />
-          <button type="submit" style="margin-top: 18px">Let Me In</button>
-          <div class="age-error" id="ageError">You must be 21 years or older to continue.</div>
+          <fieldset class="choice-group" role="radiogroup" aria-labelledby="ageQuestion">
+            <legend id="ageQuestion" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">
+              Are you 21 years old or older?
+            </legend>
+            <label class="choice-option" for="ageYes">
+              <input id="ageYes" name="ageConfirmation" type="radio" value="yes" required aria-required="true" />
+              <span>Yes, I am 21 or older.</span>
+            </label>
+            <label class="choice-option" for="ageNo">
+              <input id="ageNo" name="ageConfirmation" type="radio" value="no" />
+              <span>No, I am under 21.</span>
+            </label>
+          </fieldset>
+          <button type="submit" style="margin-top: 6px">Continue</button>
+          <div class="age-error" id="ageError">Please confirm that you are 21 or older to continue.</div>
         </form>
       </div>
     </section>
@@ -522,10 +602,11 @@
        * Apps Script communication, and dynamic rendering with verbose logging.
        */
       (function () {
-        /** @type {{birthDate: string|null, birthYear: number|null}} */
+        /** @type {{isVerified: boolean, birthYear: number|null, verifiedAt: string|null}} */
         const userSession = {
-          birthDate: null,
+          isVerified: false,
           birthYear: null,
+          verifiedAt: null,
         };
 
         /** @type {Array<Object>} */
@@ -537,7 +618,7 @@
         const ageGate = document.getElementById('ageGate');
         const ageForm = document.getElementById('ageForm');
         const ageError = document.getElementById('ageError');
-        const birthDateInput = document.getElementById('birthDate');
+        const ageOptions = document.querySelectorAll("input[name='ageConfirmation']");
         const appShell = document.getElementById('appShell');
         const homeButton = document.getElementById('homeButton');
         const homeView = document.getElementById('homeView');
@@ -656,31 +737,39 @@
          */
         function handleAgeGate(event) {
           event.preventDefault();
-          const value = birthDateInput.value;
-          if (!value) {
-            ageError.textContent = 'Please provide your birthdate to proceed.';
+          var selected = null;
+          ageOptions.forEach(function (option) {
+            if (option.checked) {
+              selected = option.value;
+            }
+          });
+
+          if (!selected) {
+            ageError.textContent = 'Please confirm that you are 21 or older to continue.';
             ageError.classList.add('active');
+            console.warn('[AgeGate] Submission blocked due to missing confirmation.');
             return;
           }
 
-          const birthDate = new Date(value + 'T00:00:00');
-          const today = new Date();
-          const age = today.getFullYear() - birthDate.getFullYear();
-          const hasHadBirthday =
-            today.getMonth() > birthDate.getMonth() ||
-            (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
-          const computedAge = hasHadBirthday ? age : age - 1;
-
-          if (computedAge < 21) {
-            ageError.textContent = 'You must be 21 years or older to continue.';
+          if (selected !== 'yes') {
+            ageError.textContent = 'Access is limited to guests who are 21 years or older.';
             ageError.classList.add('active');
+            console.warn('[AgeGate] Access denied because visitor is under 21.');
             return;
           }
 
           ageError.classList.remove('active');
-          userSession.birthDate = value;
-          userSession.birthYear = birthDate.getFullYear();
-          userSignature.textContent = 'Verified: ' + value;
+          const verificationTimestamp = new Date();
+          userSession.isVerified = true;
+          // Default to the minimum eligible birth year to maintain deterministic
+          // generator inputs while respecting the streamlined verification flow.
+          userSession.birthYear = verificationTimestamp.getFullYear() - 21;
+          userSession.verifiedAt = verificationTimestamp.toISOString();
+          userSignature.textContent =
+            '21+ Verified • ' + verificationTimestamp.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+          console.info('[AgeGate] Visitor affirmed they are 21+. Session unlocked.', {
+            verifiedAt: userSession.verifiedAt,
+          });
           ageGate.style.display = 'none';
           appShell.classList.add('active');
           switchView(homeView);
@@ -729,7 +818,7 @@
             return null;
           }
 
-          if (!userSession.birthYear) {
+          if (!userSession.isVerified) {
             showToast('Age verification required before generation.');
             return null;
           }
@@ -738,7 +827,9 @@
             generatorKey: generatorSelect.value,
             birthMonth: Number(birthMonthSelect.value),
             birthDay: dayValue,
-            birthYear: userSession.birthYear,
+            // Ensure the generator receives a consistent birth year even if the
+            // session falls back to the minimum eligible value.
+            birthYear: userSession.birthYear || new Date().getFullYear() - 21,
             firstName: firstNameInput.value.trim(),
             lastName: lastNameInput.value.trim(),
           };
